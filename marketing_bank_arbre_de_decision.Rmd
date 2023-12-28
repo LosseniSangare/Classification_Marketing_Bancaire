@@ -1,0 +1,118 @@
+---
+title: "Marketing_Bank_Arbre_de_decision"
+author: "Losséni SANGARE"
+date: "2023-12-13"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+# ARBRE DE DECISION 
+
+```{r}
+options(repos = c(CRAN = "https://cran.r-project.org"))# pour permettre l'execution du fichier r-markdown (Knit)
+```
+
+```{r}
+rm(list=ls())
+```
+
+
+## Chargement des fichiers
+```{r}
+souscription <- read.csv("D:/UTT/PROGRAMATION R/Data/Souscription.csv", sep=";")
+View(souscription)
+```
+
+## Convertir toutes les variables en facteurs
+
+```{r}
+colonnes_catégorielles <- c("job", "marital", "education", "default","housing","loan","contact","month","day_of_week","poutcome","y")
+
+# Convertir les variables catégorielles en facteurs avec lapply
+souscription[colonnes_catégorielles] <- lapply(souscription[colonnes_catégorielles], as.factor)
+
+```
+
+## Importation de la librairie de, l'arbre de decision
+
+```{r}
+#install.packages("dplyr")
+library(dplyr)
+#install.packages("rpart")
+library(rpart)
+```
+## les données en ensembles d'entraînement (70%) et de test (30%)
+```{r}
+  set.seed(1234)  # Pour la reproductibilité
+  indices <- sample(1:nrow(souscription), size = 0.7 * nrow(souscription))
+  train_data <- souscription[indices, ]
+  test_data <- souscription[-indices, ]
+```
+
+## sauvegarde et suppression de la cible y des donnée de test
+```{r}
+#cible_test = test_data$y
+#test_data = test_data[,-ncol(test_data)]
+```
+
+## Modelisation par l'arbre de decision de la variable dependante y en fonction des autres variable
+```{r}
+arbre = rpart(y~.,data = train_data, cp=0.03)
+arbre
+```
+## Methode CART
+## affichage de l'arbre produit sur notre jeu de données d'entrainement
+
+pour cela nous avons besoin d'importer le module plot de la librairie rpart que nous venons de charger
+```{r}
+install.packages("rpart.plot")
+library("rpart.plot")
+rpart.plot(arbre,main="Representation de l'arbre")
+```
+
+## prediction sur les données de test
+
+```{r}
+pred = predict(arbre, newdata=test_data, type = 'class')
+
+```
+
+## comparaison de la prédiction par rapport aux vrai valeur y de l'ensemble de test
+
+```{r}
+mean(pred == test_data$y)
+table(pred, test_data$y)
+```
+La methode CART nous donne une precision de 91,58% sur les données de test .
+la Matrice de confusion nous donne comme détail 1056 vrai négatif (y == "no" et la prediction a donnée "no"), et 71 vrai positif((y == "yes" et la prediction a donnée "yes")
+
+
+#choix du meilleur cout de complexité par validation croisé
+
+```{r}
+grille_cp = data.frame(cp= seq(0.01, 0.1, by = 0.01))
+library(caret)
+
+ctrl = trainControl(method = "cv",index = list(1:dim(train_data)[1])) # method="cv" pour validation croisé
+sel_cp = train(y ~ ., data = souscription, method = "rpart", trControl = ctrl, tuneGrid = grille_cp)
+plot(sel_cp,lwd=2.5)
+sel_cp
+
+```
+apres validation croisé le cp optimal est 0.02 avec un accuracy de 9.34% sur l'ensemble train
+
+## Ajustement du model 
+
+```{r}
+arbre = rpart(y~.,data = train_data, cp=0.02)
+rpart.plot(arbre,main="Representation de l'arbre")
+```
+
+```{r}
+pred = predict(arbre, newdata=test_data, type = 'class')
+mean(pred == test_data$y)
+table(pred, test_data$y)
+```
+Après ajustement du model, la methode CART nous donne une precision de 92,55% sur les données de test .
+la Matrice de confusion nous donne comme détail 1084 vrai négatif (y == "no" et la prediction a donnée "no"), et 60 vrai positif((y == "yes" et la prediction a donnée "yes")
